@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   release:
     name: Tauri Build (${{ matrix.platform }})
@@ -15,8 +18,11 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
+            args: --target universal-apple-darwin
           - platform: ubuntu-latest
+            args: ""
           - platform: windows-latest
+            args: ""
 
     steps:
       - name: Checkout
@@ -37,6 +43,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Cache Cargo
         uses: actions/cache@v4
@@ -88,15 +96,13 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
-          includeRelease: true
           tagName: ${{ github.ref_name }}
-          releaseName: ChmlFrpLauncher ${{ github.ref_name }}
+          releaseName: ChmlFrp节点推荐器 ${{ github.ref_name }}
           releaseBody: |
             ## 更新内容
 
             ${{ steps.changelog.outputs.changelog }}
           releaseDraft: false
           prerelease: false
+          args: ${{ matrix.args }}
