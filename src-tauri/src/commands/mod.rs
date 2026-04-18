@@ -1,7 +1,17 @@
 pub mod http;
 pub mod tcping;
+pub mod ping;
+pub mod tcp_speed;
 pub mod background;
+pub mod file_server;
+pub mod frpc;
+pub mod download;
 
 pub use http::*;
 pub use tcping::*;
+pub use ping::*;
+pub use tcp_speed::*;
 pub use background::*;
+pub use file_server::*;
+pub use frpc::*;
+pub use download::*;

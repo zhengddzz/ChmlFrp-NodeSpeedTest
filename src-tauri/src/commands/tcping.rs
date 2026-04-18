@@ -11,12 +11,33 @@ pub struct TcpingResult {
 }
 
 #[tauri::command]
-pub async fn tcping_host(host: String) -> Result<TcpingResult, String> {
-    info!("Starting TCP ping test for host: {}:7000", host);
+pub async fn tcping_host(host: String, port: Option<u16>, timeout: Option<u64>) -> Result<TcpingResult, String> {
+    let port = port.unwrap_or(7000);
+    let timeout_secs = timeout.unwrap_or(3);
+    
+    info!("Starting TCP ping test for host: {}:{}", host, port);
+
+    if host.is_empty() {
+        return Ok(TcpingResult {
+            success: false,
+            latency: None,
+            error: Some("Host is empty".to_string()),
+            raw_output: Some("Host is empty".to_string()),
+        });
+    }
+
+    if port == 0 {
+        return Ok(TcpingResult {
+            success: false,
+            latency: None,
+            error: Some("Port is 0".to_string()),
+            raw_output: Some("Port is 0".to_string()),
+        });
+    }
     
     tokio::task::spawn_blocking(move || {
         let start = Instant::now();
-        let addr_str = format!("{}:7000", host);
+        let addr_str = format!("{}:{}", host, port);
         
         debug!("Resolving and connecting to: {}", addr_str);
         
@@ -29,7 +50,10 @@ pub async fn tcping_host(host: String) -> Result<TcpingResult, String> {
                     break;
                 }
                 match found {
-                    Some(addr) => addr,
+                    Some(addr) => {
+                        info!("Resolved {} to {}", addr_str, addr);
+                        addr
+                    }
                     None => {
                         let error_msg = format!("Failed to resolve host: {}", host);
                         error!("{}", error_msg);
@@ -56,31 +80,31 @@ pub async fn tcping_host(host: String) -> Result<TcpingResult, String> {
         
         debug!("Connecting to resolved address: {}", socket_addr);
         
-        match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(3)) {
+        match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(timeout_secs)) {
             Ok(_stream) => {
                 let duration = start.elapsed();
                 let latency_ms = duration.as_secs_f64() * 1000.0;
                 
-                info!("TCP ping to {}:7000 successful: {:.2}ms", host, latency_ms);
+                info!("TCP ping to {}:{} successful: {:.2}ms", host, port, latency_ms);
                 
                 Ok(TcpingResult {
                     success: true,
                     latency: Some(latency_ms),
                     error: None,
-                    raw_output: Some(format!("Connected to {}:7000 in {:.2}ms", host, latency_ms)),
+                    raw_output: Some(format!("Connected to {}:{} in {:.2}ms", host, port, latency_ms)),
                 })
             }
             Err(e) => {
                 let duration = start.elapsed();
                 let error_msg = format!("TCP connection failed: {}", e);
                 
-                warn!("TCP ping to {}:7000 failed after {:.2}ms: {}", host, duration.as_secs_f64() * 1000.0, e);
+                warn!("TCP ping to {}:{} failed after {:.2}ms: {}", host, port, duration.as_secs_f64() * 1000.0, e);
                 
                 Ok(TcpingResult {
                     success: false,
                     latency: None,
                     error: Some(error_msg.clone()),
-                    raw_output: Some(format!("Failed to connect to {}:7000: {}", host, e)),
+                    raw_output: Some(format!("Failed to connect to {}:{}: {}", host, port, e)),
                 })
             }
         }

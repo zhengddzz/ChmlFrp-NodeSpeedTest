@@ -12,13 +12,9 @@ import {
 } from "./utils";
 import { AppearanceSection } from "./components/AppearanceSection";
 import { UpdateSection } from "./components/UpdateSection";
-import {
-  getCurrentVersion,
-  checkForUpdates,
-  openDownloadPage,
-  type UpdateInfo,
-} from "@/services/update";
+import { updateService, type UpdateInfo } from "@/services/updateService";
 import { toast } from "sonner";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 export function Settings() {
   const isMacOS =
@@ -66,9 +62,14 @@ export function Settings() {
   const [currentVersion, setCurrentVersion] = useState<string>("");
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [autoCheckEnabled, setAutoCheckEnabled] = useState(() =>
+    updateService.getAutoCheckEnabled(),
+  );
 
   useEffect(() => {
-    getCurrentVersion().then(setCurrentVersion);
+    updateService.getCurrentVersion().then(setCurrentVersion);
   }, []);
 
   useEffect(() => {
@@ -117,26 +118,57 @@ export function Settings() {
   const handleCheckUpdate = useCallback(async () => {
     setCheckingUpdate(true);
     try {
-      const info = await checkForUpdates();
-      if (info) {
-        setUpdateInfo(info);
-        if (info.hasUpdate) {
-          toast.success(`发现新版本 v${info.latestVersion}`);
-        } else {
-          toast.success("当前已是最新版本");
-        }
+      const result = await updateService.checkUpdate();
+      if (result.available) {
+        setUpdateInfo({
+          version: result.version || "",
+          date: result.date,
+          body: result.body,
+        });
+        toast.success(`发现新版本 v${result.version}`);
       } else {
-        toast.error("检查更新失败，请稍后重试");
+        setUpdateInfo(null);
+        toast.success("当前已是最新版本");
       }
-    } catch {
-      toast.error("检查更新失败，请稍后重试");
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "检查更新失败";
+      toast.error(errorMsg, {
+        action: {
+          label: "手动检查",
+          onClick: () => {
+            void openUrl(updateService.getReleaseUrl());
+          },
+        },
+      });
     } finally {
       setCheckingUpdate(false);
     }
   }, []);
 
-  const handleOpenDownload = useCallback((url: string) => {
-    openDownloadPage(url);
+  const handleUpdate = useCallback(async () => {
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    try {
+      await updateService.installUpdate((progress) => {
+        setDownloadProgress(progress);
+      });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "更新失败";
+      toast.error(errorMsg, {
+        action: {
+          label: "手动下载",
+          onClick: () => {
+            void openUrl(updateService.getReleaseUrl());
+          },
+        },
+      });
+      setIsDownloading(false);
+    }
+  }, []);
+
+  const handleAutoCheckChange = useCallback((enabled: boolean) => {
+    setAutoCheckEnabled(enabled);
+    updateService.setAutoCheckEnabled(enabled);
   }, []);
 
   return (
@@ -151,7 +183,11 @@ export function Settings() {
           currentVersion={currentVersion}
           onCheckUpdate={handleCheckUpdate}
           updateInfo={updateInfo}
-          onOpenDownload={handleOpenDownload}
+          onUpdate={handleUpdate}
+          isDownloading={isDownloading}
+          downloadProgress={downloadProgress}
+          autoCheckEnabled={autoCheckEnabled}
+          onAutoCheckChange={handleAutoCheckChange}
         />
 
         <AppearanceSection

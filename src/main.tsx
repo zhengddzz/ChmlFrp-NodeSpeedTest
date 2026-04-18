@@ -82,7 +82,25 @@ const preventTextSelection = () => {
   });
 };
 
+const preventContextMenu = () => {
+  document.addEventListener("contextmenu", (e) => {
+    const target = e.target as HTMLElement;
+    const tagName = target.tagName;
+    
+    if (
+      tagName === "INPUT" ||
+      tagName === "TEXTAREA" ||
+      target.isContentEditable === true
+    ) {
+      return;
+    }
+    
+    e.preventDefault();
+  });
+};
+
 preventTextSelection();
+preventContextMenu();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
