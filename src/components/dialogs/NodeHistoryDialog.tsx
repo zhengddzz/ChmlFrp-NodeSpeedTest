@@ -17,7 +17,7 @@ interface NodeHistoryDialogProps {
   type: "latency" | "speed";
 }
 
-export function NodeHistoryDialog({ isOpen, onClose, nodeName, nodeId, type }: NodeHistoryDialogProps) {
+export function NodeHistoryDialog({ isOpen, onClose, nodeName, nodeId: _nodeId, type }: NodeHistoryDialogProps) {
   const [history, setHistory] = useState<TestHistoryRecord[]>([]);
 
   useEffect(() => {

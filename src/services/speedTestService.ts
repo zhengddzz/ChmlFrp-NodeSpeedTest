@@ -250,7 +250,6 @@ export class SpeedTestService {
         success: true,
         latency,
         downloadSpeed,
-        tunnelInfo,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
