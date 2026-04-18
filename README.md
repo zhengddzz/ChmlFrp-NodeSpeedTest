@@ -63,8 +63,8 @@ pnpm tauri build
 
 | 分支 | 说明 |
 |------|------|
-| `main` | 开发分支，日常开发在此进行 |
-| `production` | 生产分支，稳定版本代码 |
+| `main` | 生产分支，稳定版本代码 |
+| `develop` | 开发分支，日常开发在此进行 |
 
 ### 提交规范
 
@@ -79,17 +79,17 @@ pnpm tauri build
 
 ### 合并到生产分支
 
-当 `main` 分支开发完成并测试通过后，合并到 `production` 分支：
+当 `develop` 分支开发完成并测试通过后，合并到 `main` 分支：
 
 ```bash
 # 切换到生产分支
-git checkout production
+git checkout main
 
 # 合并开发分支
-git merge main
+git merge develop
 
 # 推送到远程
-git push origin production
+git push origin main
 ```
 
 合并后会自动触发 GitHub Actions 构建并发布新版本。
