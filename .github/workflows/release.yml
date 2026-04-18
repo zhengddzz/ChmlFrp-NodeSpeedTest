@@ -65,7 +65,38 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'ChmlFrp节点推荐器 ${{ github.ref_name }}'
-          releaseBody: 'See the assets to download and install this version.'
+          releaseBody: |
+            ## 🚀 ChmlFrp 节点推荐器
+
+            快速测试节点延迟，帮助用户选择最优节点。
+
+            ## ✨ 功能特性
+
+            - 🔍 **节点测速** - TCP 连接测试，快速获取节点延迟
+            - 🌍 **地域筛选** - 支持国内/国外节点筛选
+            - 👤 **用户筛选** - VIP/普通用户节点分类
+            - 📊 **智能排序** - 按延迟或编号排序
+            - 📌 **窗口置顶** - 方便随时查看测试进度
+            - 💾 **结果持久化** - 测试结果自动保存
+            - 🔄 **自动更新** - 支持 GitHub 自动检查更新
+
+            ## 📥 下载说明
+
+            | 平台 | 安装包 | 说明 |
+            |------|--------|------|
+            | Windows | `.msi` 或 `.exe` | 双击安装即可 |
+            | macOS | `.dmg` | 拖拽到应用程序文件夹（仅支持 Apple Silicon） |
+            | Linux | `.deb` 或 `.AppImage` | 根据发行版安装 |
+
+            ## 📋 系统要求
+
+            - **Windows**: Windows 10/11 (x64)
+            - **macOS**: macOS 11.0+ (Apple Silicon)
+            - **Linux**: Ubuntu 20.04+ (x64)
+
+            ---
+
+            **问题反馈**: https://github.com/zhengddzz/ChmlFrp-NodeSpeedTest/issues
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
