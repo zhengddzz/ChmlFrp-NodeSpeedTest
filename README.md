@@ -2,7 +2,7 @@
 
 <div align="center">
 
-
+![ChmlFrp节点推荐器](src-tauri/icons/icon.png)
 
 **快速测试节点延迟，帮助用户选择最优节点**
 
