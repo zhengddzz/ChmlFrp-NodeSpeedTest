@@ -354,23 +354,6 @@ export function NodeTest({ user, onTestingChange }: NodeTestProps) {
     }).sort((a, b) => b.timestamp - a.timestamp);
   }, [testHistory, regionFilter, userTypeFilter]);
 
-  const addToHistory = useCallback((node: NodeWithTest, success: boolean, latency?: number, error?: string) => {
-    const newRecord: TestHistory = {
-      id: Date.now().toString(),
-      nodeId: node.id,
-      nodeName: node.name,
-      area: node.area,
-      nodegroup: node.nodegroup,
-      china: node.china,
-      success,
-      latency,
-      error,
-      timestamp: Date.now(),
-    };
-    
-    saveHistory([newRecord, ...testHistory].slice(0, 100));
-  }, [testHistory, saveHistory]);
-
   const openBatchSpeedTestWithNodes = useCallback(() => {
     const nodesToTest = visibleSelectedCount > 0 
       ? filteredNodes.filter((n) => selectedNodeIds.has(n.id))
