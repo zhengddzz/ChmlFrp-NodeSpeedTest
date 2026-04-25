@@ -17,8 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Network, RefreshCw, CheckCircle2, XCircle, Clock, Filter, History, Globe, Users, ArrowUpDown, ArrowUp, ArrowDown, Search, CheckSquare, Square, SquareX, Gauge, Download, Zap, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { fetchNodes, fetchNodeInfo, type Node, type StoredUser } from "@/services/api";
-import { invoke } from "@tauri-apps/api/core";
+import { fetchNodes, type Node, type StoredUser } from "@/services/api";
 import { getInitialEffectType, type EffectType } from "@/lib/settings-utils";
 import { SpeedTestDialog, getBatchTestState, subscribeBatchTestState } from "@/components/dialogs/BatchSpeedTestDialog";
 import { BatchTestFloatingWidget } from "@/components/dialogs/BatchTestFloatingWidget";
@@ -28,13 +27,6 @@ import { addTestHistory } from "@/services/testHistoryService";
 interface NodeTestProps {
   user: StoredUser | null;
   onTestingChange?: (testing: boolean) => void;
-}
-
-interface TcpingResult {
-  success: boolean;
-  latency?: number;
-  error?: string;
-  raw_output?: string;
 }
 
 interface NodeWithTest extends Node {
@@ -378,55 +370,6 @@ export function NodeTest({ user, onTestingChange }: NodeTestProps) {
     
     saveHistory([newRecord, ...testHistory].slice(0, 100));
   }, [testHistory, saveHistory]);
-
-  const testSingleNode = useCallback(async (node: NodeWithTest) => {
-    if (!user) return;
-
-    try {
-      const testingNodes = nodesRef.current.map((n) =>
-        n.id === node.id ? { ...n, testStatus: "testing" as const } : n
-      );
-      setNodes(testingNodes);
-
-      const nodeInfo = await fetchNodeInfo(node.name);
-      
-      const host = nodeInfo.real_IP || nodeInfo.realIp || nodeInfo.ip;
-      
-      if (!host) {
-        throw new Error("无法获取节点IP地址");
-      }
-
-      const result = await invoke<TcpingResult>("tcping_host", { host });
-
-      const updatedNodes: NodeWithTest[] = nodesRef.current.map((n) =>
-        n.id === node.id
-          ? {
-              ...n,
-              testStatus: (result.success ? "success" : "failed") as "success" | "failed",
-              latency: result.latency ?? undefined,
-              error: result.error ?? undefined,
-              lastTested: Date.now(),
-            }
-          : n
-      );
-      setNodes(updatedNodes);
-      saveTestResults(updatedNodes);
-
-      addToHistory(node, result.success, result.latency, result.error);
-    } catch (error) {
-      const updatedNodes: NodeWithTest[] = nodesRef.current.map((n) =>
-        n.id === node.id
-          ? {
-              ...n,
-              testStatus: "failed" as const,
-              error: error instanceof Error ? error.message : "测试失败",
-            }
-          : n
-      );
-      setNodes(updatedNodes);
-      saveTestResults(updatedNodes);
-    }
-  }, [user, addToHistory, saveTestResults]);
 
   const openBatchSpeedTestWithNodes = useCallback(() => {
     const nodesToTest = visibleSelectedCount > 0 
