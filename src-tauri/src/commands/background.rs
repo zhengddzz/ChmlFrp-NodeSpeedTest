@@ -4,9 +4,10 @@ use crate::utils::get_app_data_dir;
 
 #[tauri::command]
 pub async fn copy_background_video(
+    app_handle: tauri::AppHandle,
     source_path: String,
 ) -> Result<String, String> {
-    let data_dir = get_app_data_dir()?;
+    let data_dir = get_app_data_dir(&app_handle)?;
 
     let background_dir = data_dir.join("backgrounds");
     fs::create_dir_all(&background_dir).map_err(|e| e.to_string())?;
@@ -29,9 +30,10 @@ pub async fn copy_background_video(
 
 #[tauri::command]
 pub async fn copy_background_image(
+    app_handle: tauri::AppHandle,
     source_path: String,
 ) -> Result<String, String> {
-    let data_dir = get_app_data_dir()?;
+    let data_dir = get_app_data_dir(&app_handle)?;
 
     let background_dir = data_dir.join("backgrounds");
     fs::create_dir_all(&background_dir).map_err(|e| e.to_string())?;
@@ -54,8 +56,9 @@ pub async fn copy_background_image(
 
 #[tauri::command]
 pub async fn get_background_video_path(
+    app_handle: tauri::AppHandle,
 ) -> Result<Option<String>, String> {
-    let data_dir = get_app_data_dir()?;
+    let data_dir = get_app_data_dir(&app_handle)?;
 
     let background_dir = data_dir.join("backgrounds");
 

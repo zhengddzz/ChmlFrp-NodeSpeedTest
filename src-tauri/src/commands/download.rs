@@ -141,7 +141,7 @@ pub async fn download_frpc(app_handle: tauri::AppHandle) -> Result<String, Strin
     let expected_hash = download_info.hash;
     let expected_size = download_info.size;
 
-    let frpc_path = app_data_frpc_path()?;
+    let frpc_path = app_data_frpc_path(&app_handle)?;
     if let Some(parent) = frpc_path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }

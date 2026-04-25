@@ -8,8 +8,8 @@ use log::{info, warn, error};
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
-fn generate_config_file(config: &SpeedTestConfig) -> Result<std::path::PathBuf, String> {
-    let data_dir = get_app_data_dir()?;
+fn generate_config_file(config: &SpeedTestConfig, app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let data_dir = get_app_data_dir(app_handle)?;
 
     let config_path = data_dir.join("speedtest_frpc.ini");
 
@@ -92,7 +92,7 @@ pub async fn start_frpc(
         }
     }
     
-    let config_path = generate_config_file(&config)?;
+    let config_path = generate_config_file(&config, &app_handle)?;
     info!("[Frpc] Config file created at: {:?}", config_path);
 
     let mut cmd = Command::new(&frpc_path);
