@@ -15,11 +15,16 @@ import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Network, Play, RefreshCw, CheckCircle2, XCircle, Clock, Filter, History, Globe, Users, ArrowUpDown, ArrowUp, ArrowDown, Search, CheckSquare, Square, SquareX } from "lucide-react";
+import { Network, Play, RefreshCw, CheckCircle2, XCircle, Clock, Filter, History, Globe, Users, ArrowUpDown, ArrowUp, ArrowDown, Search, CheckSquare, Square, SquareX, Gauge, Download, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { fetchNodes, fetchNodeInfo, type Node, type StoredUser } from "@/services/api";
 import { invoke } from "@tauri-apps/api/core";
 import { getInitialEffectType, type EffectType } from "@/lib/settings-utils";
+import { SpeedTestDialog } from "@/components/dialogs/SpeedTestDialog";
+import { BatchSpeedTestDialog, getBatchTestState, subscribeBatchTestState } from "@/components/dialogs/BatchSpeedTestDialog";
+import { BatchTestFloatingWidget } from "@/components/dialogs/BatchTestFloatingWidget";
+import { NodeHistoryDialog } from "@/components/dialogs/NodeHistoryDialog";
+import { addTestHistory } from "@/services/testHistoryService";
 
 interface NodeTestProps {
   user: StoredUser | null;
@@ -36,6 +41,7 @@ interface TcpingResult {
 interface NodeWithTest extends Node {
   testStatus?: "idle" | "testing" | "success" | "failed";
   latency?: number;
+  downloadSpeed?: number;
   error?: string;
   lastTested?: number;
 }
@@ -44,6 +50,7 @@ interface SavedTestResult {
   id: number;
   testStatus: "idle" | "testing" | "success" | "failed";
   latency?: number;
+  downloadSpeed?: number;
   error?: string;
   lastTested?: number;
 }
@@ -93,7 +100,20 @@ export function NodeTest({ user, onTestingChange }: NodeTestProps) {
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<number>>(new Set());
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [speedTestNode, setSpeedTestNode] = useState<NodeWithTest | null>(null);
+  const [batchTestNodes, setBatchTestNodes] = useState<NodeWithTest[] | null>(null);
+  const [showBatchTestDialog, setShowBatchTestDialog] = useState(false);
+  const [historyNode, setHistoryNode] = useState<{ node: NodeWithTest; type: "latency" | "speed" } | null>(null);
   const stopTestingRef = useRef(false);
+
+  useEffect(() => {
+    return subscribeBatchTestState(() => {
+      const state = getBatchTestState();
+      if (!state.isRunning && showBatchTestDialog) {
+        setShowBatchTestDialog(false);
+      }
+    });
+  }, [showBatchTestDialog]);
 
   const saveTestResults = useCallback((nodesToSave: NodeWithTest[]) => {
     const results = nodesToSave
@@ -102,6 +122,7 @@ export function NodeTest({ user, onTestingChange }: NodeTestProps) {
         id: n.id,
         testStatus: n.testStatus,
         latency: n.latency,
+        downloadSpeed: n.downloadSpeed,
         error: n.error,
         lastTested: n.lastTested,
       }));
@@ -154,6 +175,7 @@ export function NodeTest({ user, onTestingChange }: NodeTestProps) {
             ...node,
             testStatus: savedResult.testStatus,
             latency: savedResult.latency,
+            downloadSpeed: savedResult.downloadSpeed,
             error: savedResult.error,
             lastTested: savedResult.lastTested,
           };
@@ -285,17 +307,21 @@ export function NodeTest({ user, onTestingChange }: NodeTestProps) {
     });
     
     if (sortField) {
-      result = [...result].sort((a, b) => {
-        if (sortField === "id") {
-          return sortDirection === "asc" ? a.id - b.id : b.id - a.id;
-        } else if (sortField === "latency") {
-          const aLatency = a.latency ?? Infinity;
-          const bLatency = b.latency ?? Infinity;
-          return sortDirection === "asc" ? aLatency - bLatency : bLatency - aLatency;
-        }
-        return 0;
-      });
+  result = [...result].sort((a, b) => {
+    if (sortField === "id") {
+      return sortDirection === "asc" ? a.id - b.id : b.id - a.id;
+    } else if (sortField === "latency") {
+      const aLatency = a.latency ?? Infinity;
+      const bLatency = b.latency ?? Infinity;
+      return sortDirection === "asc" ? aLatency - bLatency : bLatency - aLatency;
+    } else if (sortField === "downloadSpeed") {
+      const aSpeed = a.downloadSpeed ?? (sortDirection === "asc" ? Infinity : -1);
+      const bSpeed = b.downloadSpeed ?? (sortDirection === "asc" ? Infinity : -1);
+      return sortDirection === "asc" ? aSpeed - bSpeed : bSpeed - aSpeed;
     }
+    return 0;
+  });
+}
     
     return result;
   }, [nodes, regionFilter, userTypeFilter, sortField, sortDirection, searchQuery]);
@@ -426,31 +452,19 @@ export function NodeTest({ user, onTestingChange }: NodeTestProps) {
     }
   }, [user, selectedNodeIds, filteredNodes, testSingleNode]);
 
-  const testAllNodes = useCallback(async () => {
-    if (!user || filteredNodes.length === 0) return;
-
-    try {
-      setTestingAll(true);
-      stopTestingRef.current = false;
-      
-      for (const node of filteredNodes) {
-        if (stopTestingRef.current) break;
-        await testSingleNode(node);
-        await new Promise((resolve) => setTimeout(resolve, 200));
-      }
-      
-      if (!stopTestingRef.current) {
-        toast.success("所有节点测试完成");
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "测试过程中发生错误";
-      toast.error(message);
-    } finally {
-      setTestingAll(false);
-      stopTestingRef.current = false;
+  const openBatchSpeedTestWithNodes = useCallback(() => {
+    const nodesToTest = selectedNodeIds.size > 0 
+      ? filteredNodes.filter((n) => selectedNodeIds.has(n.id))
+      : filteredNodes;
+    
+    if (nodesToTest.length === 0) {
+      toast.error("没有可测试的节点");
+      return;
     }
-  }, [user, filteredNodes, testSingleNode]);
+    
+    setBatchTestNodes(nodesToTest);
+    setShowBatchTestDialog(true);
+  }, [filteredNodes, selectedNodeIds]);
 
   const getStatusBadge = (node: NodeWithTest) => {
     switch (node.testStatus) {
@@ -540,24 +554,36 @@ export function NodeTest({ user, onTestingChange }: NodeTestProps) {
             )}
           </Button>
           {!showHistory && selectedNodeIds.size > 0 && (
-            <Button
-              size="sm"
-              onClick={() => void testSelectedNodes()}
-              disabled={testingAll || loading}
-              className="h-8 px-3 text-xs"
-            >
-              {testingAll ? (
-                <>
-                  <RefreshCw className="animate-spin h-3.5 w-3.5 mr-1.5" />
-                  测试中...
-                </>
-              ) : (
-                <>
-                  <Play className="h-3.5 w-3.5 mr-1.5" />
-                  测试选中 ({selectedNodeIds.size})
-                </>
-              )}
-            </Button>
+            <>
+              <Button
+                size="sm"
+                onClick={() => void testSelectedNodes()}
+                disabled={testingAll || loading}
+                className="h-8 px-3 text-xs"
+              >
+                {testingAll ? (
+                  <>
+                    <RefreshCw className="animate-spin h-3.5 w-3.5 mr-1.5" />
+                    测试中...
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-3.5 w-3.5 mr-1.5" />
+                    延迟测试 ({selectedNodeIds.size})
+                  </>
+                )}
+              </Button>
+              <Button
+            size="sm"
+            variant="outline"
+            onClick={openBatchSpeedTestWithNodes}
+            disabled={testingAll || loading}
+            className="h-8 px-3 text-xs"
+          >
+                <Zap className="h-3.5 w-3.5 mr-1.5" />
+                速度测试 ({selectedNodeIds.size})
+              </Button>
+            </>
           )}
           {!showHistory && selectedNodeIds.size === 0 && (
             testingAll ? (
@@ -573,12 +599,12 @@ export function NodeTest({ user, onTestingChange }: NodeTestProps) {
             ) : (
               <Button
                 size="sm"
-                onClick={() => void testAllNodes()}
+                onClick={openBatchSpeedTestWithNodes}
                 disabled={loading || filteredNodes.length === 0}
                 className="h-8 px-3 text-xs"
               >
                 <Play className="h-3.5 w-3.5 mr-1.5" />
-                全部测试
+                全部速度测试
               </Button>
             )
           )}
@@ -780,8 +806,25 @@ export function NodeTest({ user, onTestingChange }: NodeTestProps) {
                         <ArrowUpDown className="w-3 h-3 opacity-50" />
                       )}
                     </button>
-                  </TableHead>
-                  <TableHead className="text-right">操作</TableHead>
+        </TableHead>
+        <TableHead>
+          <button
+            onClick={() => handleSort("downloadSpeed")}
+            className="flex items-center gap-1 hover:text-foreground transition-colors"
+          >
+            带宽速度
+            {sortField === "downloadSpeed" ? (
+              sortDirection === "asc" ? (
+                <ArrowUp className="w-3 h-3" />
+              ) : (
+                <ArrowDown className="w-3 h-3" />
+              )
+            ) : (
+              <ArrowUpDown className="w-3 h-3 opacity-50" />
+            )}
+          </button>
+        </TableHead>
+        <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -821,9 +864,29 @@ export function NodeTest({ user, onTestingChange }: NodeTestProps) {
                     <TableCell>{getStatusBadge(node)}</TableCell>
                     <TableCell>
                       {node.latency != null ? (
-                        <span className="flex items-center gap-1">
+                        <span 
+                          className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => setHistoryNode({ node, type: "latency" })}
+                          title="点击查看延迟历史"
+                        >
                           <Clock className="w-3 h-3 text-muted-foreground" />
                           {node.latency.toFixed(0)}ms
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {node.downloadSpeed != null ? (
+                        <span 
+                          className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => setHistoryNode({ node, type: "speed" })}
+                          title="点击查看速度历史"
+                        >
+                          <Download className="w-3 h-3 text-muted-foreground" />
+                          {node.downloadSpeed >= 1000
+                            ? `${(node.downloadSpeed / 1000).toFixed(1)} Gbps`
+                            : `${node.downloadSpeed.toFixed(0)} Mbps`}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">-</span>
@@ -833,15 +896,12 @@ export function NodeTest({ user, onTestingChange }: NodeTestProps) {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => void testSingleNode(node)}
+                        onClick={() => setSpeedTestNode(node)}
                         disabled={node.testStatus === "testing"}
                         className="h-7 px-2 text-xs"
+                        title="速度测试"
                       >
-                        {node.testStatus === "testing" ? (
-                          <RefreshCw className="animate-spin h-3.5 w-3.5" />
-                        ) : (
-                          <Play className="h-3.5 w-3.5" />
-                        )}
+                        <Gauge className="h-3.5 w-3.5" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -851,6 +911,90 @@ export function NodeTest({ user, onTestingChange }: NodeTestProps) {
           </div>
         </ScrollArea>
       )}
+
+      <SpeedTestDialog
+        isOpen={speedTestNode !== null}
+        onClose={() => setSpeedTestNode(null)}
+        nodeName={speedTestNode?.name || ""}
+        onTestComplete={(result) => {
+          if (speedTestNode) {
+            addTestHistory({
+              nodeName: speedTestNode.name,
+              nodeId: speedTestNode.id,
+              timestamp: Date.now(),
+              latency: result.latency,
+              downloadSpeed: result.downloadSpeed,
+              success: true,
+            });
+            const updatedNodes: NodeWithTest[] = nodesRef.current.map((n) =>
+              n.id === speedTestNode.id
+                ? {
+                    ...n,
+                    testStatus: "success" as const,
+                    latency: result.latency,
+                    downloadSpeed: result.downloadSpeed,
+                    lastTested: Date.now(),
+                  }
+                : n
+            );
+            setNodes(updatedNodes);
+            saveTestResults(updatedNodes);
+          }
+        }}
+      />
+
+      <BatchSpeedTestDialog
+        isOpen={showBatchTestDialog && batchTestNodes !== null}
+        onClose={(isMinimized?: boolean) => {
+          setShowBatchTestDialog(false);
+          if (!isMinimized) {
+            setBatchTestNodes(null);
+          }
+        }}
+        nodeNames={batchTestNodes?.map(n => n.name) || []}
+        onTestComplete={(results) => {
+          let updatedNodes = [...nodesRef.current];
+          results.forEach((result, nodeName) => {
+            const nodeIndex = updatedNodes.findIndex(n => n.name === nodeName);
+            if (nodeIndex !== -1) {
+              const node = updatedNodes[nodeIndex];
+              addTestHistory({
+                nodeName: node.name,
+                nodeId: node.id,
+                timestamp: Date.now(),
+                latency: result.latency,
+                downloadSpeed: result.downloadSpeed,
+                success: !result.error,
+                error: result.error,
+              });
+              updatedNodes[nodeIndex] = {
+                ...node,
+                testStatus: result.error ? "failed" as const : "success" as const,
+                latency: result.latency,
+                downloadSpeed: result.downloadSpeed,
+                error: result.error,
+                lastTested: Date.now(),
+              };
+            }
+          });
+          setNodes(updatedNodes);
+          saveTestResults(updatedNodes);
+          setBatchTestNodes(null);
+        }}
+      />
+
+      <BatchTestFloatingWidget 
+        onExpand={() => setShowBatchTestDialog(true)} 
+        isDialogOpen={showBatchTestDialog && batchTestNodes !== null}
+      />
+
+      <NodeHistoryDialog
+        isOpen={historyNode !== null}
+        onClose={() => setHistoryNode(null)}
+        nodeName={historyNode?.node.name || ""}
+        nodeId={historyNode?.node.id || 0}
+        type={historyNode?.type || "latency"}
+      />
     </div>
   );
 }

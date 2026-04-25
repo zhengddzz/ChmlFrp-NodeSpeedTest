@@ -1,4 +1,4 @@
-import { Sparkles, ExternalLink, Check, AlertCircle } from "lucide-react";
+import { Sparkles, Download, Check, AlertCircle } from "lucide-react";
 import {
   Item,
   ItemContent,
@@ -6,14 +6,18 @@ import {
   ItemDescription,
   ItemActions,
 } from "@/components/ui/item";
-import type { UpdateInfo } from "@/services/update";
+import type { UpdateInfo } from "@/services/updateService";
 
 interface UpdateSectionProps {
   checkingUpdate: boolean;
   currentVersion: string;
   onCheckUpdate: () => void;
   updateInfo: UpdateInfo | null;
-  onOpenDownload: (url: string) => void;
+  onUpdate: () => void;
+  isDownloading: boolean;
+  downloadProgress: number;
+  autoCheckEnabled: boolean;
+  onAutoCheckChange: (enabled: boolean) => void;
 }
 
 export function UpdateSection({
@@ -21,7 +25,11 @@ export function UpdateSection({
   currentVersion,
   onCheckUpdate,
   updateInfo,
-  onOpenDownload,
+  onUpdate,
+  isDownloading,
+  downloadProgress,
+  autoCheckEnabled,
+  onAutoCheckChange,
 }: UpdateSectionProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -44,6 +52,29 @@ export function UpdateSection({
           className="border-0 border-b border-border/60 last:border-0"
         >
           <ItemContent>
+            <ItemTitle>启动时自动检查更新</ItemTitle>
+            <ItemDescription className="text-xs">
+              应用启动时自动检查是否有新版本
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoCheckEnabled}
+                onChange={(e) => onAutoCheckChange(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-muted rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+          </ItemActions>
+        </Item>
+
+        <Item
+          variant="outline"
+          className="border-0 border-b border-border/60 last:border-0"
+        >
+          <ItemContent>
             <ItemTitle>应用更新</ItemTitle>
             <ItemDescription className="text-xs">
               {currentVersion && (
@@ -54,9 +85,9 @@ export function UpdateSection({
           <ItemActions>
             <button
               onClick={onCheckUpdate}
-              disabled={checkingUpdate}
+              disabled={checkingUpdate || isDownloading}
               className={`px-3 py-1.5 text-xs rounded transition-colors ${
-                checkingUpdate
+                checkingUpdate || isDownloading
                   ? "bg-muted text-muted-foreground cursor-not-allowed"
                   : "bg-foreground text-background hover:opacity-90"
               }`}
@@ -70,7 +101,7 @@ export function UpdateSection({
           <Item variant="outline" className="border-0 border-b border-border/60">
             <ItemContent>
               <div className="flex items-center gap-2">
-                {updateInfo.hasUpdate ? (
+                {updateInfo.version ? (
                   <>
                     <AlertCircle className="w-4 h-4 text-yellow-500" />
                     <ItemTitle className="text-yellow-500">发现新版本</ItemTitle>
@@ -83,31 +114,51 @@ export function UpdateSection({
                 )}
               </div>
               <ItemDescription className="text-xs">
-                {updateInfo.hasUpdate ? (
+                {updateInfo.version ? (
                   <span>
-                    最新版本: v{updateInfo.latestVersion}
-                    {updateInfo.publishedAt && (
+                    最新版本: v{updateInfo.version}
+                    {updateInfo.date && (
                       <span className="ml-2 text-muted-foreground">
-                        ({formatDate(updateInfo.publishedAt)})
+                        ({formatDate(updateInfo.date)})
                       </span>
                     )}
                   </span>
                 ) : (
-                  <span>v{updateInfo.latestVersion}</span>
+                  <span>v{currentVersion}</span>
                 )}
               </ItemDescription>
             </ItemContent>
-            {updateInfo.hasUpdate && updateInfo.downloadUrl && (
+            {updateInfo.version && (
               <ItemActions>
                 <button
-                  onClick={() => onOpenDownload(updateInfo.downloadUrl)}
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs rounded bg-primary text-primary-foreground hover:opacity-90 transition-colors"
+                  onClick={onUpdate}
+                  disabled={isDownloading}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs rounded bg-primary text-primary-foreground hover:opacity-90 transition-colors disabled:opacity-50"
                 >
-                  <ExternalLink className="w-3 h-3" />
-                  下载更新
+                  <Download className="w-3 h-3" />
+                  {isDownloading ? `${downloadProgress.toFixed(0)}%` : "立即更新"}
                 </button>
               </ItemActions>
             )}
+          </Item>
+        )}
+
+        {isDownloading && (
+          <Item variant="outline" className="border-0">
+            <ItemContent>
+              <div className="w-full">
+                <div className="flex items-center justify-between text-xs mb-2">
+                  <span className="text-muted-foreground">正在下载更新...</span>
+                  <span className="text-foreground font-mono">{downloadProgress.toFixed(0)}%</span>
+                </div>
+                <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-primary to-primary/80 h-full rounded-full transition-all duration-300"
+                    style={{ width: `${downloadProgress}%` }}
+                  />
+                </div>
+              </div>
+            </ItemContent>
           </Item>
         )}
       </div>

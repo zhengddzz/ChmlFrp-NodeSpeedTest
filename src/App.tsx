@@ -7,8 +7,12 @@ import { getStoredUser, type StoredUser } from "@/services/api";
 import { useAppTheme } from "@/components/App/hooks/useAppTheme";
 import { useTitleBar } from "@/components/App/hooks/useTitleBar";
 import { useBackground } from "@/components/App/hooks/useBackground";
+import { useUpdateCheck } from "@/components/App/hooks/useUpdateCheck";
 import { BackgroundLayer } from "@/components/App/components/BackgroundLayer";
+import { UpdateDialog } from "@/components/dialogs/UpdateDialog";
 import { getInitialSidebarMode, type SidebarMode } from "@/lib/settings-utils";
+import { updateService } from "@/services/updateService";
+import { toast } from "sonner";
 
 function App() {
   const [activeTab, setActiveTab] = useState("node-test");
@@ -27,6 +31,9 @@ function App() {
 
   useAppTheme();
   const { showTitleBar } = useTitleBar();
+  const { updateInfo, setUpdateInfo } = useUpdateCheck();
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
   const shouldShowTitleBar = isMacOS
     ? showTitleBar
@@ -103,8 +110,35 @@ function App() {
     }
   }, [videoRef, videoVolume]);
 
+  const handleUpdate = useCallback(async () => {
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    try {
+      await updateService.installUpdate((progress) => {
+        setDownloadProgress(progress);
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "更新失败");
+      setIsDownloading(false);
+    }
+  }, []);
+
+  const handleCloseUpdateDialog = useCallback(() => {
+    setUpdateInfo(null);
+  }, [setUpdateInfo]);
+
   return (
     <>
+      <UpdateDialog
+        isOpen={updateInfo !== null}
+        onClose={handleCloseUpdateDialog}
+        onUpdate={handleUpdate}
+        version={updateInfo?.version || ""}
+        date={updateInfo?.date}
+        body={updateInfo?.body}
+        isDownloading={isDownloading}
+        downloadProgress={downloadProgress}
+      />
       <div
         ref={appContainerRef}
         className={`flex flex-col h-screen w-screen overflow-hidden text-foreground ${

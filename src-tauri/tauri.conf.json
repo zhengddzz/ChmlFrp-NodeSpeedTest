@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ChmlFrp节点推荐器",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "identifier": "net.chmlfrp.noderecommender",
   "build": {
     "frontendDist": "../dist",
@@ -34,7 +34,7 @@
     "withGlobalTauri": true
   },
   "bundle": {
-    "createUpdaterArtifacts": false,
+    "createUpdaterArtifacts": true,
     "active": true,
     "targets": "all",
     "windows": {
@@ -49,5 +49,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/zhengddzz/ChmlFrp-NodeSpeedTest/releases/latest/download/{{target}}-{{arch}}.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgxODc4NDg3OUE4QzY0NTYKUldSV1pJeWFoNFNIZ1NibWpRalJnSzNuM0dIVTN3ZDZGWTkzZTI0eHBzL2UxdEpvZ0h4eDdxYm4K"
+    }
   }
 }
