@@ -196,11 +196,6 @@ export function NodeTest({ user, onTestingChange }: NodeTestProps) {
     setHistoryLoading(false);
   }, []);
 
-  const saveHistory = useCallback((history: TestHistory[]) => {
-    setTestHistory(history);
-    localStorage.setItem("node_test_history", JSON.stringify(history));
-  }, []);
-
   const nodesRef = useRef(nodes);
   useEffect(() => {
     nodesRef.current = nodes;
