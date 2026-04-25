@@ -1,6 +1,6 @@
 [package]
 name = "chmlfrp-node-recommender"
-version = "1.2.1"
+version = "1.2.2"
 description = "ChmlFrp交流社区-节点推荐器"
 authors = ["ChmlFrp社区"]
 license = "Apache-2.0"
